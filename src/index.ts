@@ -1,9 +1,12 @@
 import express, { Request, Response } from 'express';
+import http from 'http';
+import { Server as WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { body, validationResult } from 'express-validator';
 import { config } from 'dotenv';
+import bodyParser from 'body-parser';
 
 // Initialize dotenv
 if (process.env.NODE_ENV !== 'production') {
@@ -11,6 +14,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const app = express();
+const server = http.createServer(app);
 
 const allowedOrigins = ['https://elixir-ai.vercel.app', 'http://localhost:3000'];
 
@@ -28,6 +32,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.raw({ type: 'application/vnd.custom-type' }));
 app.use(express.text({ type: 'text/html' }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Healthcheck endpoint
 app.get('/', (req, res) => {
@@ -39,6 +45,20 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const api = express.Router();
+
+const wss = new WebSocketServer({ server: server, path: "/ws" });
+wss.on('connection', ws => {
+  console.log('WebSocket connection established');
+  ws.on('message', message => {
+    console.log('Received message:', message);
+    // Broadcast message to all connected clients
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  });
+});
 
 api.get('/hello', (req, res) => {
   res.status(200).send({ message: 'hello world' });

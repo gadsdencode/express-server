@@ -94,7 +94,7 @@ api.post('/create-chat-with-user', [
     const { data: otherUserData, error: otherUserError } = await supabase
       .from('profiles')
       .select('id')
-      .eq('username', newUserName)
+      .eq('name', newUserName)
       .single();
 
     if (otherUserError) throw new Error('User not found');

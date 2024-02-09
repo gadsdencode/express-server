@@ -9,15 +9,14 @@ export const app = express();
 const allowedOrigins = ['https://elixir-ai.vercel.app', 'http://localhost:3000'];
 
 app.use(cors({
-  origin: function(origin, callback){
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if(!origin) return callback(null, true);
-    if(allowedOrigins.indexOf(origin) === -1){
-      var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
-  }
+  },
+  credentials: true, // if your frontend needs to send cookies or credentials with requests
 }));
 
 app.use(express.json());
@@ -121,26 +120,39 @@ api.post('/create-chat-with-user', async (req: Request, res: Response) => {
 });
 
 api.get('/fetch-user-profile', async (req: Request, res: Response) => {
-  const username = req.query.username as string;
+  const { username } = req.query;
+
   if (!username) {
     return res.status(400).json({ message: 'Username is required' });
   }
+
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id')
+      .select('*')
       .eq('name', username)
       .single();
 
-    if (error) throw new Error('User not found');
+    if (error) {
+      // Assuming Supabase uses this error type for "not found"; adjust based on actual behavior
+      if (error.message === 'Item not found') {
+        return res.status(404).json({ message: 'User not found' });
+      } else {
+        // Log the error or handle it as per your error handling policy
+        console.error('Supabase error:', error);
+        return res.status(500).json({ message: 'An unexpected error occurred' });
+      }
+    }
 
     res.json(data);
   } catch (error) {
-    // Type assertion to tell TypeScript that we expect error to have a message property
-    const message = (error as { message: string }).message || 'An unexpected error occurred';
-    res.status(500).json({ message }); // Send error message as JSON response
+    console.error('Error fetching user profile:', error);
+    // Since .single() can throw for no results, you might want to handle that specifically
+    // This catch block will also catch other unexpected errors
+    return res.status(500).json({ message: 'An unexpected error occurred', error: (error as { message: string }).message });
   }
 });
+
 
 api.post('/send-message', async (req: Request, res: Response) => {
   const { chat_id, author_id, content } = req.body;

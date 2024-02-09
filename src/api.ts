@@ -2,10 +2,23 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { body, validationResult } from 'express-validator';
 
 export const app = express();
 
-app.use(cors({ origin: true }));
+const allowedOrigins = ['https://elixir-ai.vercel.app', 'http://localhost:3000'];
+
+app.use(cors({
+  origin: function(origin, callback){
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
 
 app.use(express.json());
 app.use(express.raw({ type: 'application/vnd.custom-type' }));
@@ -61,6 +74,15 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
     res.status(500).json({ message }); // Send error message as JSON response
   }
 });
+
+api.post('/create-chat-with-user', [
+  body('userId').not().isEmpty().withMessage('User ID is required'),
+  body('newUserName').not().isEmpty().withMessage('New user name is required'),
+], async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
 api.post('/create-chat-with-user', async (req: Request, res: Response) => {
   const { userId, newUserName } = req.body;
@@ -146,4 +168,4 @@ api.post('/send-message', async (req: Request, res: Response) => {
 
 
 // Version the api
-app.use('/api/v1', api);
+app.use('/api/v1', api)});

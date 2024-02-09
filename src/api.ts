@@ -3,6 +3,12 @@ import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { body, validationResult } from 'express-validator';
+import { config } from 'dotenv';
+
+// Initialize dotenv
+if (process.env.NODE_ENV !== 'production') {
+  config();
+}
 
 export const app = express();
 
@@ -208,7 +214,5 @@ api.post('/send-message', async (req: Request, res: Response) => {
 // Version the api
 app.use('/api/v1', api)});
 
-// Start the server at the very end
-app.listen(process.env.PORT || 3333, () => {
-  console.log(`Server started on port ${process.env.PORT || 3333}`);
-});
+const port = process.env.PORT || 3333;
+app.listen(port, () => console.log(`Server started on port ${port}`));

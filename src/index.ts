@@ -235,4 +235,6 @@ api.post('/send-message', async (req: Request, res: Response) => {
 app.use('/api/v1', api);
 
 const port = process.env.PORT || 3333;
-app.listen(port, () => console.log(`Server started on port ${port}`));
+server.listen(port, () => {
+  console.log(`Server started on port ${port}`);
+});

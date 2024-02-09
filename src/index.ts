@@ -10,7 +10,7 @@ if (process.env.NODE_ENV !== 'production') {
   config();
 }
 
-const app = express();
+export const app = express();
 
 const allowedOrigins = ['https://elixir-ai.vercel.app', 'http://localhost:3000'];
 

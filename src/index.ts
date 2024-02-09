@@ -89,7 +89,6 @@ api.post('/create-chat-with-user', [
     return res.status(400).json({ errors: errors.array() });
   }
 
-api.post('/create-chat-with-user', async (req: Request, res: Response) => {
   const { userId, newUserName } = req.body;
   try {
     const { data: otherUserData, error: otherUserError } = await supabase
@@ -119,11 +118,11 @@ api.post('/create-chat-with-user', async (req: Request, res: Response) => {
 
     res.json({ newChatId });
   } catch (error) {
-    // Type assertion to tell TypeScript that we expect error to have a message property
     const message = (error as { message: string }).message || 'An unexpected error occurred';
-    res.status(500).json({ message }); // Send error message as JSON response
+    res.status(500).json({ message });
   }
 });
+
 
 // Add this endpoint to your Express server
 api.get('/fetch-user-by-name', async (req: Request, res: Response) => {
@@ -212,7 +211,7 @@ api.post('/send-message', async (req: Request, res: Response) => {
 
 
 // Version the api
-app.use('/api/v1', api)});
+app.use('/api/v1', api);
 
 const port = process.env.PORT || 3333;
 app.listen(port, () => console.log(`Server started on port ${port}`));

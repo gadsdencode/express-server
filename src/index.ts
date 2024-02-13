@@ -49,14 +49,40 @@ const api = express.Router();
 const wss = new WebSocketServer({ server: server, path: "/ws" });
 wss.on('connection', ws => {
   console.log('WebSocket connection established');
-  ws.on('message', message => {
+  ws.on('message', async rawData => {
+    // Convert rawData to string if it's not already a string
+    const message = rawData.toString();
+
     console.log('Received message:', message);
-    // Broadcast message to all connected clients
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+
+    try {
+      const parsedMessage = JSON.parse(message);
+
+      // Insert the message into Supabase
+      const { error } = await supabase
+        .from('messages')
+        .insert([
+          {
+            chat_id: parsedMessage.chat_id,
+            author_id: parsedMessage.author_id,
+            content: parsedMessage.content,
+          },
+        ]);
+
+      if (error) {
+        throw new Error(`Failed to insert message into Supabase: ${error.message}`);
       }
-    });
+
+      // Broadcast message to all connected clients
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    } catch (error) {
+      console.error('Error handling message:', error);
+      ws.send(JSON.stringify({ error: 'Failed to process message' }));
+    }
   });
 });
 

@@ -116,6 +116,37 @@ api.get('/fetch-chat-history/:chatId', async (req: Request, res: Response) => {
   }
 });
 
+api.get('/fetch-coaches', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .eq('role', 'coach');
+
+    if (error) throw new Error(`Failed to fetch coaches: ${error.message}`);
+    res.json(data);
+  } catch (error) {
+    const message = (error as { message: string }).message || 'Error fetching coaches.';
+    res.status(500).json({ message });
+  }
+});
+
+api.post('/create-coach-selection', async (req, res) => {
+  const { userId, coachId } = req.body;
+
+  try {
+    const { error } = await supabase
+      .from('user_coach_relationships')
+      .insert([{ user_id: userId, coach_id: coachId }]);
+
+    if (error) throw new Error(`Failed to create coach-user relationship: ${error.message}`);
+    res.json({ success: true });
+  } catch (error) {
+    const message = (error as { message: string }).message || 'Error creating coach selection.';
+    res.status(500).json({ message });
+  }
+});
+
 
 api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;

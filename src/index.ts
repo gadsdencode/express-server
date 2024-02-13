@@ -100,19 +100,19 @@ api.get('/fetch-chat-history/:chatId', async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('*') // Consider selecting only necessary fields if optimization is needed
       .eq('chat_id', chatId)
       .order('created_at', { ascending: true });
+      // .range(0, 99); // Example of pagination limit for the first 100 messages
 
     if (error) {
       throw new Error(`Failed to fetch chat history: ${error.message}`);
     }
 
-    res.json(data);
+    res.json(data); // Directly aligns with frontend expectation
   } catch (error) {
-    // Type assertion to tell TypeScript that we expect error to have a message property
     const message = (error as { message: string }).message || 'Error fetching chat history.';
-    res.status(500).json({ message }); // Send error message as JSON response
+    res.status(500).json({ message });
   }
 });
 

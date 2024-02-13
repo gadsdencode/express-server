@@ -165,6 +165,25 @@ api.post('/fetch-coach-bio-and-image', async (req, res) => {
   }
 });
 
+api.post('/update-coaching-preferences', async (req, res) => {
+  const { userId, coachingTypes } = req.body;
+
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        // Adjust the column name and format as per your database schema.
+        coachingTypes: coachingTypes.join(','), // Join array into comma-separated string if necessary
+      })
+      .match({ id: userId });
+
+    if (error) throw new Error(`Failed to update coaching preferences: ${error.message}`);
+    res.json({ success: true, message: 'Coaching preferences updated successfully.' });
+  } catch (error) {
+    const message = (error as { message: string }).message || 'An unexpected error occurred.';
+    res.status(500).json({ message });
+  }
+});
 
 api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;

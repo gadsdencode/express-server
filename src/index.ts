@@ -166,14 +166,14 @@ api.post('/fetch-coach-bio-and-image', async (req, res) => {
 });
 
 api.post('/update-coaching-preferences', async (req, res) => {
-  const { userId, coachingTypes } = req.body;
+  const { userId, selectedCoachingTypes } = req.body;
 
   try {
     const { error } = await supabase
       .from('profiles')
       .update({
         // Adjust the column name and format as per your database schema.
-        coachingTypes: coachingTypes.join(','), // Join array into comma-separated string if necessary
+        focusCareer: selectedCoachingTypes.join(','), // Join array into comma-separated string if necessary
       })
       .match({ id: userId });
 

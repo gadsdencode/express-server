@@ -165,25 +165,46 @@ api.post('/fetch-coach-bio-and-image', async (req, res) => {
   }
 });
 
-api.post('/update-coaching-preferences', async (req, res) => {
+api.post('/upsert-coaching-preferences', async (req, res) => {
   const { userId, selectedCoachingTypes } = req.body;
 
   try {
-    const { error } = await supabase
+    const { data: existingData, error: findError } = await supabase
       .from('profiles')
-      .update({
-        // Adjust the column name and format as per your database schema.
-        focusCareer: selectedCoachingTypes.join(','), // Join array into comma-separated string if necessary
-      })
-      .match({ id: userId });
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-    if (error) throw new Error(`Failed to update coaching preferences: ${error.message}`);
-    res.json({ success: true, message: 'Coaching preferences updated successfully.' });
+    if (findError && findError.message !== 'Item not found') {
+      throw findError;
+    }
+
+    let dbResponse; // Variable to store the response of the database operation
+    if (existingData) {
+      // User exists, update their preferences
+      dbResponse = await supabase
+        .from('profiles')
+        .update({ focusCareer: selectedCoachingTypes.join(',') })
+        .match({ id: userId });
+      if (dbResponse.error) throw dbResponse.error;
+    } else {
+      // User does not exist, create a new profile
+      dbResponse = await supabase
+        .from('profiles')
+        .insert([{ id: userId, focusCareer: selectedCoachingTypes.join(',') }]);
+      if (dbResponse.error) throw dbResponse.error;
+    }
+
+    console.log(dbResponse); // Example usage of dbResponse
+    res.json({ success: true, message: 'Coaching preferences upserted successfully.' });
   } catch (error) {
-    const message = (error as { message: string }).message || 'An unexpected error occurred.';
-    res.status(500).json({ message });
+    // Type assertion to tell TypeScript that we expect error to have a message property
+    const message = (error as { message: string }).message || 'An unexpected error occurred';
+    res.status(500).json({ message }); // Send error message as JSON response
   }
 });
+
+
 
 api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;

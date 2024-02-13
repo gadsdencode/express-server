@@ -147,6 +147,24 @@ api.post('/create-coach-selection', async (req, res) => {
   }
 });
 
+api.post('/fetch-coach-bio-and-image', async (req, res) => {
+  const { coachId } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('coachbio')
+      .select('*') // Adjust the selection as needed
+      .eq('userId', coachId)
+      .single();
+
+    if (error) throw new Error(`Failed to fetch coach bio: ${error.message}`);
+    res.json(data);
+  } catch (error) {
+    const message = (error as { message: string }).message || 'An unexpected error occurred.';
+    res.status(500).json({ message });
+  }
+});
+
 
 api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;

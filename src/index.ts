@@ -114,7 +114,29 @@ api.get('/hello', (req, res) => {
   res.status(200).send({ message: 'hello world' });
 });
 
-// Server code snippet
+api.post('/submit-coach-form', async (req, res) => {
+  const { userId, q1, q2, q3, q4, q5 } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required' });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('coachvet')
+      .insert([{ userId, q1, q2, q3, q4, q5 }]);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({ message: 'Form submitted successfully' });
+  } catch (error) {
+    const message = (error as { message: string }).message || 'Error submitting coaching form.';
+    res.status(500).json({ message });
+  }
+});
+
 api.get('/fetch-user-bio-and-image/:userId', async (req: Request, res: Response) => {
   const { userId } = req.params;
 

@@ -114,6 +114,33 @@ api.get('/hello', (req, res) => {
   res.status(200).send({ message: 'hello world' });
 });
 
+// Server code snippet
+api.get('/fetch-user-bio-and-image/:userId', async (req: Request, res: Response) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('userbio')
+      .select('name, jobTitle, bio, email, phone, location, userId, imageUrl')
+      .eq('userId', userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ message: 'User bio not found.' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    const errorMessage = (error as Error).message || 'Fetching userbio and image failed.';
+    res.status(500).json({ message: errorMessage });
+  }
+});
+
+
 api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
   const { userId } = req.params;
 

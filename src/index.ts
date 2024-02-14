@@ -117,9 +117,8 @@ api.get('/hello', (req, res) => {
 api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
   const { userId } = req.params;
 
-  // Validate userId is not empty and is a valid UUID
-  if (!userId || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(userId)) {
-    return res.status(400).json({ message: 'Invalid User ID.' });
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
   }
 
   try {
@@ -130,16 +129,21 @@ api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
       .single();
 
     if (error || !data) {
-      return res.status(404).json({ message: 'Resume URL not found or error fetching.' });
+      return res.status(404).json({ message: 'Resume URL not found.' });
     }
 
-    res.json(data);
+    let resumeUrl = data.resumeUrl;
+    // Check if the URL is for a .doc or .docx file and format it for Google Docs Viewer
+    if (resumeUrl.match(/\.(doc|docx)$/i)) {
+      resumeUrl = `https://docs.google.com/gview?url=${encodeURIComponent(resumeUrl)}&embedded=true`;
+    }
+
+    res.json({ resumeUrl });
   } catch (error) {
     const errorMessage = (error as Error).message || 'An unexpected error occurred.';
     res.status(500).json({ message: errorMessage });
   }
 });
-
 
 api.get('/fetch-chat-history/:chatId', async (req: Request, res: Response) => {
   const { chatId } = req.params;

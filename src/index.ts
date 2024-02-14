@@ -117,8 +117,9 @@ api.get('/hello', (req, res) => {
 api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
   const { userId } = req.params;
 
-  if (!userId) {
-    return res.status(400).json({ message: 'User ID is required' });
+  // Validate userId is not empty and is a valid UUID
+  if (!userId || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(userId)) {
+    return res.status(400).json({ message: 'Invalid User ID.' });
   }
 
   try {
@@ -129,7 +130,7 @@ api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
       .single();
 
     if (error || !data) {
-      return res.status(404).json({ message: 'Resume URL not found.' });
+      return res.status(404).json({ message: 'Resume URL not found or error fetching.' });
     }
 
     res.json(data);
@@ -138,6 +139,7 @@ api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
     res.status(500).json({ message: errorMessage });
   }
 });
+
 
 api.get('/fetch-chat-history/:chatId', async (req: Request, res: Response) => {
   const { chatId } = req.params;

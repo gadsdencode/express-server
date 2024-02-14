@@ -44,6 +44,9 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
 const api = express.Router();
 
 const wss = new WebSocketServer({ server: server, path: "/ws" });
@@ -84,6 +87,27 @@ wss.on('connection', ws => {
       ws.send(JSON.stringify({ error: 'Failed to process message' }));
     }
   });
+});
+
+app.post('/generate-text', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ message: 'Prompt is required' });
+  }
+
+  try {
+    // For text-only input, use the gemini-pro model
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    res.json({ generatedText: text });
+  } catch (error) {
+    const message = (error as { message: string }).message || 'Error fetching chat history.';
+    res.status(500).json({ message });
+  }
 });
 
 api.get('/hello', (req, res) => {
@@ -164,47 +188,6 @@ api.post('/fetch-coach-bio-and-image', async (req, res) => {
     res.status(500).json({ message });
   }
 });
-
-api.post('/upsert-coaching-preferences', async (req, res) => {
-  const { userId, selectedCoachingTypes } = req.body;
-
-  try {
-    const { data: existingData, error: findError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (findError && findError.message !== 'Item not found') {
-      throw findError;
-    }
-
-    let dbResponse; // Variable to store the response of the database operation
-    if (existingData) {
-      // User exists, update their preferences
-      dbResponse = await supabase
-        .from('profiles')
-        .update({ focusCareer: selectedCoachingTypes.join(',') })
-        .match({ id: userId });
-      if (dbResponse.error) throw dbResponse.error;
-    } else {
-      // User does not exist, create a new profile
-      dbResponse = await supabase
-        .from('profiles')
-        .insert([{ id: userId, focusCareer: selectedCoachingTypes.join(',') }]);
-      if (dbResponse.error) throw dbResponse.error;
-    }
-
-    console.log(dbResponse); // Example usage of dbResponse
-    res.json({ success: true, message: 'Coaching preferences upserted successfully.' });
-  } catch (error) {
-    // Type assertion to tell TypeScript that we expect error to have a message property
-    const message = (error as { message: string }).message || 'An unexpected error occurred';
-    res.status(500).json({ message }); // Send error message as JSON response
-  }
-});
-
-
 
 api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;

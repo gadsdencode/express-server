@@ -336,6 +336,64 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   }
 });
 
+//Endpoint for searching for users by name via ContactSelector
+api.get('/search-users', async (req: Request, res: Response) => {
+  const { query } = req.query; // Assuming the search query is passed as a URL parameter
+
+  if (!query) {
+    return res.status(400).json({ message: 'Search query is required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email') // Adjust the selection as necessary
+      .ilike('name', `%${query}%`); // Case-insensitive search
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    const message = (error as { message: string }).message || 'An unexpected error occurred';
+    res.status(500).json({ message });
+  }
+});
+
+//Endpoint for creating a chat and linking users to that chat via ContactSelector
+api.post('/create-chat-with-user', [
+  body('userId').not().isEmpty().withMessage('User ID is required'),
+  body('otherUserId').not().isEmpty().withMessage('Other User ID is required'),
+], async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { userId, otherUserId } = req.body;
+
+  try {
+    // Create a new chat
+    const newChatId = crypto.randomUUID();
+    const { error: chatCreateError } = await supabase.from('chats').insert([{ id: newChatId }]);
+    if (chatCreateError) throw chatCreateError;
+
+    // Link both users to the new chat
+    const users = [userId, otherUserId];
+    const chatUsersInsertError = await Promise.all(
+      users.map(user => 
+        supabase.from('chats_users').insert({ chat_id: newChatId, user_id: user })
+      )
+    );
+
+    if (chatUsersInsertError.some(result => result.error)) throw new Error('Failed to link chat with users');
+
+    res.json({ newChatId });
+  } catch (error) {
+    const message = (error as { message: string }).message || 'An unexpected error occurred';
+    res.status(500).json({ message });
+  }
+});
+
 // Endpoint for creating a new chat doesn't require body validation as it creates a blank chat
 api.post('/create-chat', async (req: Request, res: Response) => {
   try {

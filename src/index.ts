@@ -114,6 +114,31 @@ api.get('/hello', (req, res) => {
   res.status(200).send({ message: 'hello world' });
 });
 
+api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('userbio')
+      .select('resumeUrl')
+      .eq('userId', userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ message: 'Resume URL not found.' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    const errorMessage = (error as Error).message || 'An unexpected error occurred.';
+    res.status(500).json({ message: errorMessage });
+  }
+});
+
 api.get('/fetch-chat-history/:chatId', async (req: Request, res: Response) => {
   const { chatId } = req.params;
 

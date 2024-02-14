@@ -194,6 +194,37 @@ api.get('/fetch-resume-url/:userId', async (req: Request, res: Response) => {
   }
 });
 
+api.get('/fetch-resume-url2/:userId', async (req: Request, res: Response) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('coachbio')
+      .select('resumeUrl')
+      .eq('userId', userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ message: 'Resume URL not found.' });
+    }
+
+    let resumeUrl = data.resumeUrl;
+    // Check if the URL is for a .doc or .docx file and format it for Google Docs Viewer
+    if (resumeUrl.match(/\.(doc|docx)$/i)) {
+      resumeUrl = `https://docs.google.com/gview?url=${encodeURIComponent(resumeUrl)}&embedded=true`;
+    }
+
+    res.json({ resumeUrl });
+  } catch (error) {
+    const errorMessage = (error as Error).message || 'An unexpected error occurred.';
+    res.status(500).json({ message: errorMessage });
+  }
+});
+
 api.get('/fetch-chat-history/:chatId', async (req: Request, res: Response) => {
   const { chatId } = req.params;
 

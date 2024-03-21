@@ -344,14 +344,17 @@ api.get('/search-users', async (req: Request, res: Response) => {
   }
   try {
     const offset = (Number(page) - 1) * Number(limit);
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('profiles')
-      .select('id, name, email')
+      .select('id, name, email', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order(sort as string, { ascending: order === 'asc' })
       .range(offset, offset + Number(limit) - 1);
     if (error) throw error;
-    res.json(data);
+    res.json({
+      profiles: data,
+      hasMore: offset + Number(limit) < count,
+    });
   } catch (error) {
     const message = (error as { message: string }).message || 'An unexpected error occurred';
     res.status(500).json({ message });

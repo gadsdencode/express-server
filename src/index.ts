@@ -338,21 +338,40 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
 
 //Endpoint for searching for users by name via ContactSelector
 api.get('/search-users', async (req: Request, res: Response) => {
-  const { query } = req.query; // Assuming the search query is passed as a URL parameter
-
+  const { query, page = 1, limit = 10, sort = 'name', order = 'asc' } = req.query;
   if (!query) {
     return res.status(400).json({ message: 'Search query is required' });
   }
+  try {
+    const offset = (Number(page) - 1) * Number(limit);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email')
+      .ilike('name', `%${query}%`)
+      .order(sort as string, { ascending: order === 'asc' })
+      .range(offset, offset + Number(limit) - 1);
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    const message = (error as { message: string }).message || 'An unexpected error occurred';
+    res.status(500).json({ message });
+  }
+});
 
+api.get('/search-suggestions', async (req: Request, res: Response) => {
+  const { query } = req.query;
+  if (!query) {
+    return res.status(400).json({ message: 'Search query is required' });
+  }
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, email') // Adjust the selection as necessary
-      .ilike('name', `%${query}%`); // Case-insensitive search
-
+      .select('name')
+      .ilike('name', `%${query}%`)
+      .limit(5);
     if (error) throw error;
-
-    res.json(data);
+    const suggestions = data.map((profile) => profile.name);
+    res.json(suggestions);
   } catch (error) {
     const message = (error as { message: string }).message || 'An unexpected error occurred';
     res.status(500).json({ message });

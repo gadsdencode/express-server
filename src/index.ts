@@ -50,41 +50,46 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const api = express.Router();
 
 const wss = new WebSocketServer({ server: server, path: "/ws" });
-wss.on('connection', ws => {
+wss.on('connection', (ws: WebSocket) => {
   console.log('WebSocket connection established');
-  ws.on('message', async rawData => {
-    // Convert rawData to string if it's not already a string
-    const message = rawData.toString();
 
-    console.log('Received message:', message);
+  ws.on('message', async (rawData: string) => {
+    const message = JSON.parse(rawData);
 
-    try {
-      const parsedMessage = JSON.parse(message);
-
-      // Insert the message into Supabase
-      const { error } = await supabase
-        .from('messages')
-        .insert([
-          {
-            chat_id: parsedMessage.chat_id,
-            author_id: parsedMessage.author_id,
-            content: parsedMessage.content,
-          },
-        ]);
-
-      if (error) {
-        throw new Error(`Failed to insert message into Supabase: ${error.message}`);
-      }
-
-      // Broadcast message to all connected clients
-      wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(message);
+    if (message.type === 'typing') {
+      // Broadcast typing event to the corresponding user
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'typing', chatId: message.chatId, userId: message.userId }));
         }
       });
-    } catch (error) {
-      console.error('Error handling message:', error);
-      ws.send(JSON.stringify({ error: 'Failed to process message' }));
+    } else {
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .insert([
+            {
+              chat_id: message.chat_id,
+              author_id: message.author_id,
+              content: message.content,
+              status: 'sent',
+            },
+          ]);
+
+        if (error) {
+          throw new Error(`Failed to insert message into Supabase: ${error.message}`);
+        }
+
+        // Broadcast message to all connected clients
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(message));
+          }
+        });
+      } catch (error) {
+        console.error('Error handling message:', error);
+        ws.send(JSON.stringify({ error: 'Failed to process message' }));
+      }
     }
   });
 });
@@ -556,27 +561,23 @@ api.get('/fetch-user-profile', async (req: Request, res: Response) => {
 
 api.post('/send-message', async (req: Request, res: Response) => {
   const { chat_id, author_id, content } = req.body;
+  const trimmedContent = content.trim();
+  if (trimmedContent === '') {
+    return res.status(400).json({ message: 'Message content cannot be empty' });
+  }
   try {
-    const messageId = crypto.randomUUID();
-
     const { error } = await supabase
       .from('messages')
       .insert([
-        { id: messageId, chat_id, author_id, content }
+        { chat_id, author_id, content: trimmedContent, status: 'sent' }
       ]);
-
     if (error) throw new Error('Failed to send message');
-
     res.json({ success: true });
   } catch (error) {
-    // Type assertion to tell TypeScript that we expect error to have a message property
     const message = (error as { message: string }).message || 'An unexpected error occurred';
-    res.status(500).json({ message }); // Send error message as JSON response
+    res.status(500).json({ message });
   }
 });
-
-
-
 
 // Version the api
 app.use('/api/v1', api);

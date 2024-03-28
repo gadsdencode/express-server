@@ -566,10 +566,25 @@ api.post('/send-message', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Message content cannot be empty' });
   }
   try {
+    // Check if the recipient is a coach
+    const { data: chatData, error: chatError } = await supabase
+      .from('chats')
+      .select('users:chats_users(user:profiles(role, id))')
+      .eq('id', chat_id)
+      .single();
+    if (chatError) throw new Error('Failed to fetch chat details');
+
+    const isCoachRecipient = chatData.users.some((chatUser: any) => chatUser.user.role === 'coach' && chatUser.user.id !== author_id);
+
     const { error } = await supabase
       .from('messages')
       .insert([
-        { chat_id, author_id, content: trimmedContent, status: 'sent' }
+        {
+          chat_id,
+          author_id,
+          content: trimmedContent,
+          status: isCoachRecipient ? 'waiting_for_coach' : 'sent',
+        },
       ]);
     if (error) throw new Error('Failed to send message');
     res.json({ success: true });

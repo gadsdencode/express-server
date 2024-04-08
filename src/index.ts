@@ -59,32 +59,56 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('message', async (rawData: string) => {
     const message = JSON.parse(rawData);
-
     if (message.type === 'reaction') {
       try {
         const { messageId, reaction, senderId } = message;
-
-        // Update the message in the database with the new reaction
+        
+        // Check if the reaction already exists for the message
+        const { data: existingReactions, error: selectError } = await supabase
+          .from('messages')
+          .select('reactions')
+          .eq('id', messageId)
+          .single();
+  
+        if (selectError) {
+          throw new Error(`Failed to fetch existing reactions: ${selectError.message}`);
+        }
+  
+        let updatedReactions = existingReactions.reactions || [];
+  
+        const existingReactionIndex = updatedReactions.findIndex(
+          (r: any) => r.emoji === reaction && r.userId === senderId
+        );
+  
+        if (existingReactionIndex !== -1) {
+          // If the reaction already exists, increment the count
+          updatedReactions[existingReactionIndex].count += 1;
+        } else {
+          // If the reaction doesn't exist, add a new reaction
+          updatedReactions.push({ emoji: reaction, userId: senderId, count: 1 });
+        }
+  
+        // Update the message in the database with the updated reactions
         const { error } = await supabase
           .from('messages')
-          .update({ reactions: supabase.rpc(`array_append(reactions, '${JSON.stringify({ emoji: reaction, userId: senderId })}')`) })
+          .update({ reactions: updatedReactions })
           .eq('id', messageId);
-
+  
         if (error) {
           throw new Error(`Failed to update message with reaction: ${error.message}`);
         }
-
+  
         // Broadcast the updated message to all connected clients
-        const { data: updatedMessage, error: selectError } = await supabase
+        const { data: updatedMessage, error: updatedSelectError } = await supabase
           .from('messages')
           .select('*')
           .eq('id', messageId)
           .single();
-
-        if (selectError) {
-          throw new Error(`Failed to fetch updated message: ${selectError.message}`);
+  
+        if (updatedSelectError) {
+          throw new Error(`Failed to fetch updated message: ${updatedSelectError.message}`);
         }
-
+  
         wss.clients.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'reactionUpdate', message: updatedMessage }));

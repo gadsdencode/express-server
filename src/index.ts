@@ -60,6 +60,42 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('message', async (rawData: string) => {
     const message = JSON.parse(rawData);
 
+    if (message.type === 'reaction') {
+      try {
+        const { messageId, reaction, senderId } = message;
+
+        // Update the message in the database with the new reaction
+        const { error } = await supabase
+          .from('messages')
+          .update({ reactions: supabase.rpc(`array_append(reactions, '${JSON.stringify({ emoji: reaction, userId: senderId })}')`) })
+          .eq('id', messageId);
+
+        if (error) {
+          throw new Error(`Failed to update message with reaction: ${error.message}`);
+        }
+
+        // Broadcast the updated message to all connected clients
+        const { data: updatedMessage, error: selectError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', messageId)
+          .single();
+
+        if (selectError) {
+          throw new Error(`Failed to fetch updated message: ${selectError.message}`);
+        }
+
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'reactionUpdate', message: updatedMessage }));
+          }
+        });
+      } catch (error) {
+        console.error('Error handling reaction:', error);
+        ws.send(JSON.stringify({ error: 'Failed to process reaction' }));
+      }
+    } else {
+    }
     if (message.type === 'typing') {
       // Broadcast typing event to the corresponding user
       wss.clients.forEach((client) => {

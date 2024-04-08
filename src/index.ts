@@ -64,8 +64,8 @@ wss.on('connection', (ws: WebSocket) => {
       try {
         const { messageId, reaction, senderId } = message;
 
-        if (!messageId) {
-          throw new Error('Message ID is required for reactions');
+        if (!messageId || messageId === 'undefined') {
+          throw new Error('Message ID is required for reactions and cannot be undefined');
         }
 
         // Fetch the existing message to check for current reactions

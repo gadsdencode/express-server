@@ -49,9 +49,13 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 const api = express.Router();
 
-const wss = new WebSocketServer({ server: server, path: "/ws" });
+const wss = new WebSocketServer({ server: server, path: '/api/v1/ws' });
 wss.on('connection', (ws: WebSocket) => {
   console.log('WebSocket connection established');
+
+  ws.on('error', (error: Error) => {
+    console.error('WebSocket error:', error);
+  });
 
   ws.on('message', async (rawData: string) => {
     const message = JSON.parse(rawData);

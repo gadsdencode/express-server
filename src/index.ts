@@ -59,70 +59,74 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('message', async (rawData: string) => {
     const message = JSON.parse(rawData);
+
     if (message.type === 'reaction') {
       try {
         const { messageId, reaction, senderId } = message;
-        
-        // Check if the message exists
-        const { data: existingMessage, error: selectMessageError } = await supabase
+
+        if (!messageId) {
+          throw new Error('Message ID is required for reactions');
+        }
+
+        // Fetch the existing message to check for current reactions
+        const { data: messageData, error: messageError } = await supabase
           .from('messages')
-          .select('id, reactions')
+          .select('reactions')
           .eq('id', messageId)
           .single();
-  
-        if (selectMessageError) {
-          throw new Error(`Failed to fetch message: ${selectMessageError.message}`);
+
+        if (messageError || !messageData) {
+          throw new Error(`Failed to fetch message: ${messageError?.message}`);
         }
-  
-        let updatedReactions = existingMessage.reactions || [];
-  
-        const existingReactionIndex = updatedReactions.findIndex(
-          (r: any) => r.emoji === reaction && r.userId === senderId
-        );
-  
-        if (existingReactionIndex !== -1) {
-          // If the reaction already exists, increment the count
-          updatedReactions[existingReactionIndex].count += 1;
+
+        let updatedReactions = messageData.reactions || [];
+
+        // Check if the reaction already exists by this sender
+        const reactionIndex = updatedReactions.findIndex(r => r.emoji === reaction && r.userId === senderId);
+
+        if (reactionIndex !== -1) {
+          // Update reaction count if it exists
+          updatedReactions[reactionIndex].count += 1;
         } else {
-          // If the reaction doesn't exist, add a new reaction
+          // Add new reaction if it doesn't exist
           updatedReactions.push({ emoji: reaction, userId: senderId, count: 1 });
         }
-  
-        // Update the message in the database with the updated reactions
-        const { error } = await supabase
+
+        // Update the message with new reactions
+        const { error: updateError } = await supabase
           .from('messages')
           .update({ reactions: updatedReactions })
           .eq('id', messageId);
-  
-        if (error) {
-          throw new Error(`Failed to update message with reaction: ${error.message}`);
+
+        if (updateError) {
+          throw new Error(`Failed to update reactions: ${updateError.message}`);
         }
-  
-        // Broadcast the updated message to all connected clients
-        const { data: updatedMessage, error: updatedSelectError } = await supabase
+
+        // Fetch the updated message to broadcast
+        const { data: updatedMessage, error: fetchError } = await supabase
           .from('messages')
           .select('*')
           .eq('id', messageId)
           .single();
-  
-        if (updatedSelectError) {
-          throw new Error(`Failed to fetch updated message: ${updatedSelectError.message}`);
+
+        if (fetchError) {
+          throw new Error(`Failed to fetch updated message: ${fetchError.message}`);
         }
-  
-        wss.clients.forEach((client) => {
+
+        // Broadcast the updated message to all connected clients
+        wss.clients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'reactionUpdate', message: updatedMessage }));
           }
         });
+
       } catch (error) {
         console.error('Error handling reaction:', error);
         ws.send(JSON.stringify({ error: 'Failed to process reaction' }));
       }
-    } else {
-    }
-    if (message.type === 'typing') {
+    } else if (message.type === 'typing') {
       // Broadcast typing event to the corresponding user
-      wss.clients.forEach((client) => {
+      wss.clients.forEach(client => {
         if (client !== ws && client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({ type: 'typing', chatId: message.chatId, userId: message.userId }));
         }
@@ -145,7 +149,7 @@ wss.on('connection', (ws: WebSocket) => {
         }
 
         // Broadcast message to all connected clients
-        wss.clients.forEach((client) => {
+        wss.clients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(message));
           }
@@ -155,8 +159,9 @@ wss.on('connection', (ws: WebSocket) => {
         ws.send(JSON.stringify({ error: 'Failed to process message' }));
       }
     }
-  });
 });
+});
+
 
 app.post('/generate-text', async (req, res) => {
   const { prompt } = req.body;

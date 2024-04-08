@@ -63,18 +63,18 @@ wss.on('connection', (ws: WebSocket) => {
       try {
         const { messageId, reaction, senderId } = message;
         
-        // Check if the reaction already exists for the message
-        const { data: existingReactions, error: selectError } = await supabase
+        // Check if the message exists
+        const { data: existingMessage, error: selectMessageError } = await supabase
           .from('messages')
-          .select('reactions')
+          .select('id, reactions')
           .eq('id', messageId)
           .single();
   
-        if (selectError) {
-          throw new Error(`Failed to fetch existing reactions: ${selectError.message}`);
+        if (selectMessageError) {
+          throw new Error(`Failed to fetch message: ${selectMessageError.message}`);
         }
   
-        let updatedReactions = existingReactions.reactions || [];
+        let updatedReactions = existingMessage.reactions || [];
   
         const existingReactionIndex = updatedReactions.findIndex(
           (r: any) => r.emoji === reaction && r.userId === senderId

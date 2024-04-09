@@ -59,31 +59,24 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('message', async (rawData: string) => {
     const message = JSON.parse(rawData);
-
     if (message.type === 'reaction') {
       try {
         const { messageId, reaction, senderId } = message;
-
-        if (!messageId || messageId === 'undefined') {
-          throw new Error('Message ID is required for reactions and cannot be undefined');
+        if (!messageId) {
+          throw new Error('Message ID is required for reactions');
         }
-
         // Fetch the existing message to check for current reactions
-        const { data: messageData, error: messageError } = await supabase
+        const { data: messageData, error: messageError } = await supabase        
           .from('messages')
-          .select('reactions')
+          .select('*')
           .eq('id', messageId)
           .single();
-
         if (messageError || !messageData) {
           throw new Error(`Failed to fetch message: ${messageError?.message}`);
         }
-
         let updatedReactions = messageData.reactions || [];
-
         // Check if the reaction already exists by this sender
         const reactionIndex = updatedReactions.findIndex(r => r.emoji === reaction && r.userId === senderId);
-
         if (reactionIndex !== -1) {
           // Update reaction count if it exists
           updatedReactions[reactionIndex].count += 1;
@@ -91,46 +84,33 @@ wss.on('connection', (ws: WebSocket) => {
           // Add new reaction if it doesn't exist
           updatedReactions.push({ emoji: reaction, userId: senderId, count: 1 });
         }
-
         // Update the message with new reactions
         const { error: updateError } = await supabase
           .from('messages')
           .update({ reactions: updatedReactions })
           .eq('id', messageId);
-
         if (updateError) {
           throw new Error(`Failed to update reactions: ${updateError.message}`);
         }
-
         // Fetch the updated message to broadcast
         const { data: updatedMessage, error: fetchError } = await supabase
           .from('messages')
           .select('*')
           .eq('id', messageId)
           .single();
-
         if (fetchError) {
           throw new Error(`Failed to fetch updated message: ${fetchError.message}`);
         }
-
         // Broadcast the updated message to all connected clients
         wss.clients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'reactionUpdate', message: updatedMessage }));
           }
         });
-
       } catch (error) {
         console.error('Error handling reaction:', error);
         ws.send(JSON.stringify({ error: 'Failed to process reaction' }));
       }
-    } else if (message.type === 'typing') {
-      // Broadcast typing event to the corresponding user
-      wss.clients.forEach(client => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ type: 'typing', chatId: message.chatId, userId: message.userId }));
-        }
-      });
     } else {
       try {
         const { error } = await supabase
@@ -147,7 +127,6 @@ wss.on('connection', (ws: WebSocket) => {
         if (error) {
           throw new Error(`Failed to insert message into Supabase: ${error.message}`);
         }
-
         // Broadcast message to all connected clients
         wss.clients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {

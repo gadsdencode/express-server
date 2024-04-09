@@ -32,7 +32,7 @@ if (process.env.NODE_ENV !== 'production') {
 export const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = ['https://kainbridge.vercel.app', 'https://elixir-alpha-seven.vercel.app', 'http://localhost:3000'];
+const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'https://kainbridge.com/coaching', 'http://localhost:3000'];
 
 app.use(cors({
   origin: (origin, callback) => {

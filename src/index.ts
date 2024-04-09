@@ -8,6 +8,22 @@ import { body, validationResult } from 'express-validator';
 import { config } from 'dotenv';
 import bodyParser from 'body-parser';
 
+interface WebSocketMessage {
+  type: string;
+  messageId?: string;
+  senderId?: string;
+  reaction?: string;
+  text?: string;
+  chat_id?: string;
+  userId?: string;
+  userName?: string;
+  userAvatar?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  author_id?: string;
+  content: string;
+}
+
 // Initialize dotenv
 if (process.env.NODE_ENV !== 'production') {
   config();
@@ -16,7 +32,7 @@ if (process.env.NODE_ENV !== 'production') {
 export const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = ['https://elixir-ai.vercel.app', 'https://elixir-alpha-seven.vercel.app', 'http://localhost:3000'];
+const allowedOrigins = ['https://kainbridge.vercel.app', 'https://elixir-alpha-seven.vercel.app', 'http://localhost:3000'];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -58,7 +74,7 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   ws.on('message', async (rawData: string) => {
-    const message = JSON.parse(rawData);
+    const message: WebSocketMessage = JSON.parse(rawData);
     if (message.type === 'reaction') {
       try {
         const { messageId, reaction, senderId } = message;

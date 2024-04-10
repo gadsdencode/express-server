@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { config } from 'dotenv';
 import winston from 'winston';
 
-config(); // Configure environment variables from .env file
+config(); // Loads environment variables from .env file
 
 interface WebSocketMessage {
   type: string;
@@ -72,8 +72,8 @@ app.get('/', (req, res) => {
   res.status(200).send({ status: 'ok' });
 });
 
-const supabaseUrl = process.env.SUPABASE_URL || 'defaultSupabaseUrl';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'defaultAnonKey';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://wlsmvssgzxytellyxbrp.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indsc212c3Nnenh5dGVsbHl4YnJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTc2NDkzNTEsImV4cCI6MjAxMzIyNTM1MX0.-7FujJy32v5FhipK173ghinQKQV_Wf4mmhxUiBayjiQ';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -100,18 +100,24 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 async function handleWebSocketMessage(message: WebSocketMessage, ws: WebSocket) {
-  if (message.type === 'reaction') {
-    await handleReaction(message, ws);
-  } else if (message.type === 'typing_started' || message.type === 'typing_stopped') {
-    await handleTypingEvent(message, ws);
-  } else {
-    await handleMessage(message, ws);
+  switch (message.type) {
+    case 'reaction':
+      await handleReaction(message, ws);
+      break;
+    case 'message':
+      await handleMessage(message, ws);
+      break;
+    case 'typing_started':
+    case 'typing_stopped':
+      await handleTypingEvent(message, ws);
+      break;
+    default:
+      ws.send(JSON.stringify({ error: 'Unsupported message type' }));
   }
 }
 
 async function handleTypingEvent(message: WebSocketMessage, ws: WebSocket) {
   const { type, senderId, chat_id } = message;
-
   if (!senderId || !chat_id) {
     ws.send(JSON.stringify({ error: 'Sender ID and Chat ID are required for typing events' }));
     return;
@@ -127,7 +133,6 @@ async function handleTypingEvent(message: WebSocketMessage, ws: WebSocket) {
 
 async function handleReaction(message: WebSocketMessage, ws: WebSocket) {
   const { messageId, reaction, senderId } = message;
-
   if (!messageId) {
     ws.send(JSON.stringify({ error: 'Message ID is required for reactions' }));
     return;
@@ -167,20 +172,16 @@ async function handleReaction(message: WebSocketMessage, ws: WebSocket) {
 
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'reactionUpdate', messageId: messageId, reactions: updatedReactions }));
+      client.send(JSON.stringify({ type: 'reactionUpdate', messageId, reactions: updatedReactions }));
     }
   });
 }
 
 async function handleMessage(message: WebSocketMessage, ws: WebSocket) {
+  const { chat_id, author_id, content } = message;
   const { error } = await supabase
     .from('messages')
-    .insert([{
-      chat_id: message.chat_id,
-      author_id: message.author_id,
-      content: message.content,
-      status: 'sent',
-    }]);
+    .insert([{ chat_id, author_id, content, status: 'sent' }]);
 
   if (error) {
     logger.error('Failed to insert message:', error.message);
@@ -194,6 +195,7 @@ async function handleMessage(message: WebSocketMessage, ws: WebSocket) {
     }
   });
 }
+
 
 const api = express.Router();
 

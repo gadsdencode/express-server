@@ -111,18 +111,21 @@ async function handleWebSocketMessage(message: WebSocketMessage, ws: WebSocket) 
 
 async function handleTypingEvent(message: WebSocketMessage, ws: WebSocket) {
   const { type, senderId, chat_id } = message;
+  logger.info(`Received typing event from ${senderId} in chat ${chat_id}: ${type}`);
 
   if (!senderId || !chat_id) {
     ws.send(JSON.stringify({ error: 'Sender ID and Chat ID are required for typing events' }));
     return;
   }
 
-  // Broadcast the typing event to all clients in the same chat room except the sender
+  let recipients = 0;
   wss.clients.forEach(client => {
     if (client !== ws && client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({ type, senderId, chat_id }));
+      recipients++;
     }
   });
+  logger.info(`Typing event ${type} from ${senderId} was sent to ${recipients} other clients.`);
 }
 
 async function handleReaction(message: WebSocketMessage, ws: WebSocket) {

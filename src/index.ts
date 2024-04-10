@@ -102,9 +102,27 @@ wss.on('connection', (ws: WebSocket) => {
 async function handleWebSocketMessage(message: WebSocketMessage, ws: WebSocket) {
   if (message.type === 'reaction') {
     await handleReaction(message, ws);
+  } else if (message.type === 'typing_started' || message.type === 'typing_stopped') {
+    await handleTypingEvent(message, ws);
   } else {
     await handleMessage(message, ws);
   }
+}
+
+async function handleTypingEvent(message: WebSocketMessage, ws: WebSocket) {
+  const { type, senderId, chat_id } = message;
+
+  if (!senderId || !chat_id) {
+    ws.send(JSON.stringify({ error: 'Sender ID and Chat ID are required for typing events' }));
+    return;
+  }
+
+  // Broadcast the typing event to all clients in the same chat room except the sender
+  wss.clients.forEach(client => {
+    if (client !== ws && client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type, senderId, chat_id }));
+    }
+  });
 }
 
 async function handleReaction(message: WebSocketMessage, ws: WebSocket) {

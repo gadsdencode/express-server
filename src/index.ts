@@ -100,24 +100,18 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 async function handleWebSocketMessage(message: WebSocketMessage, ws: WebSocket) {
-  switch (message.type) {
-    case 'reaction':
-      await handleReaction(message, ws);
-      break;
-    case 'message':
-      await handleMessage(message, ws);
-      break;
-    case 'typing_started':
-    case 'typing_stopped':
-      await handleTypingEvent(message, ws);
-      break;
-    default:
-      ws.send(JSON.stringify({ error: 'Unsupported message type' }));
+  if (message.type === 'reaction') {
+    await handleReaction(message, ws);
+  } else if (message.type === 'typing_started' || message.type === 'typing_stopped') {
+    await handleTypingEvent(message, ws);
+  } else {
+    await handleMessage(message, ws);
   }
 }
 
 async function handleTypingEvent(message: WebSocketMessage, ws: WebSocket) {
   const { type, senderId, chat_id } = message;
+
   if (!senderId || !chat_id) {
     ws.send(JSON.stringify({ error: 'Sender ID and Chat ID are required for typing events' }));
     return;
@@ -133,6 +127,7 @@ async function handleTypingEvent(message: WebSocketMessage, ws: WebSocket) {
 
 async function handleReaction(message: WebSocketMessage, ws: WebSocket) {
   const { messageId, reaction, senderId } = message;
+
   if (!messageId) {
     ws.send(JSON.stringify({ error: 'Message ID is required for reactions' }));
     return;
@@ -172,16 +167,20 @@ async function handleReaction(message: WebSocketMessage, ws: WebSocket) {
 
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'reactionUpdate', messageId, reactions: updatedReactions }));
+      client.send(JSON.stringify({ type: 'reactionUpdate', messageId: messageId, reactions: updatedReactions }));
     }
   });
 }
 
 async function handleMessage(message: WebSocketMessage, ws: WebSocket) {
-  const { chat_id, author_id, content } = message;
   const { error } = await supabase
     .from('messages')
-    .insert([{ chat_id, author_id, content, status: 'sent' }]);
+    .insert([{
+      chat_id: message.chat_id,
+      author_id: message.author_id,
+      content: message.content,
+      status: 'sent',
+    }]);
 
   if (error) {
     logger.error('Failed to insert message:', error.message);

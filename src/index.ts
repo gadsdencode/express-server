@@ -497,7 +497,7 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
       const offset = (Number(page) - 1) * Number(limit);
       const { data, error, count } = await supabase
         .from('profiles')
-        .select('id, name, email', { count: 'exact' })
+        .select('id, name, email, phone, focusCareer, focusLife, type', { count: 'exact' })
         .ilike('name', `%${query}%`)
         .order(sort as string, { ascending: order === 'asc' })
         .range(offset, offset + Number(limit) - 1);

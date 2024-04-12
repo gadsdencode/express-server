@@ -397,17 +397,16 @@ api.post('/create-coach-selection', async (req, res) => {
 
 api.post('/fetch-coach-bio-and-image', async (req, res) => {
   const { coachId } = req.body;
-
   try {
     const { data, error } = await supabase
       .from('coachbio')
       .select('*')
-      .eq('userId', coachId)
-      .single();
-
+      .eq('userId', coachId);
     if (error) throw new Error(`Failed to fetch coach bio: ${error.message}`);
-
-    res.json(data);
+    if (data.length === 0) {
+      return res.status(404).json({ message: 'Coach bio not found' });
+    }
+    res.json(data[0]);
   } catch (error) {
     const message = (error as { message: string }).message || 'An unexpected error occurred.';
     res.status(500).json({ message });

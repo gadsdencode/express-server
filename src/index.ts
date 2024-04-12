@@ -29,8 +29,14 @@ interface WebSocketMessage {
 export const app = express();
 const server = http.createServer(app);
 
-// CORS setup
-const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'http://localhost:3000'];
+const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'http://localhost:3000', '*'];
+
+const HEADERS = {
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, PATCH, DELETE",
+  "Access-Control-Allow-Headers": "X-Requested-With,content-type",
+  "Access-Control-Allow-Credentials": true
+};
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -39,7 +45,9 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
+  methods: HEADERS["Access-Control-Allow-Methods"],
+  allowedHeaders: HEADERS["Access-Control-Allow-Headers"],
+  credentials: HEADERS["Access-Control-Allow-Credentials"]
 }));
 
 // Middleware setup

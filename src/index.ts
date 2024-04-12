@@ -7,6 +7,7 @@ import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
 import { config } from 'dotenv';
 import winston from 'winston';
+import fetch from 'node-fetch'; 
 
 config(); // Loads environment variables from .env file
 
@@ -24,6 +25,11 @@ interface WebSocketMessage {
   updatedAt?: string;
   author_id?: string;
   content: string;
+}
+
+interface DailyRoomResponse {
+  url: string;
+  error?: { message: string };
 }
 
 export const app = express();
@@ -78,6 +84,34 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+app.post('/api/v1/create-room', async (req: Request, res: Response) => {
+  try {
+    const response = await fetch('https://api.daily.co/v1/rooms', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        properties: {
+          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60), // Room expires after 2 hours
+          enable_chat: true,
+        },
+      }),
+    });
+
+    const data: DailyRoomResponse = await response.json();
+    if (!response.ok) {
+        throw new Error(`Error: ${data.error ? data.error.message : 'API call failed'}`);
+    }
+
+    res.status(200).json({ room_url: data.url });
+  } catch (error: any) {
+    logger.error('Failed to create room:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 const wss = new WebSocketServer({ server, path: '/api/v1/ws' });
 

@@ -7,6 +7,7 @@ import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
 import { config } from 'dotenv';
 import winston from 'winston';
+import { CopilotBackend, OpenAIAdapter } from "@copilotkit/backend";
 
 config(); // Loads environment variables from .env file
 
@@ -206,6 +207,25 @@ async function handleMessage(message: WebSocketMessage, ws: WebSocket) {
   });
 }
 
+server.on('request', (request: http.IncomingMessage, response: http.ServerResponse) => {
+  try {
+    const headers = {
+      ...HEADERS,
+      ...(request.method === 'POST' && { 'Content-Type': 'application/json' }),
+    };
+    response.writeHead(200, headers as any); // Cast headers as any to satisfy the type checker
+    if (request.method === 'POST') {
+      const copilotKit = new CopilotBackend();
+      const openaiAdapter = new OpenAIAdapter();
+      copilotKit.streamHttpServerResponse(request, response, openaiAdapter);
+    } else {
+      response.end('openai server');
+    }
+  } catch (err) {
+    console.error(err);
+    response.end('error');
+  }
+});
 
 const api = express.Router();
 

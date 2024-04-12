@@ -7,7 +7,6 @@ import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
 import { config } from 'dotenv';
 import winston from 'winston';
-import { CopilotBackend, OpenAIAdapter } from "@copilotkit/backend";
 
 config(); // Loads environment variables from .env file
 
@@ -30,14 +29,8 @@ interface WebSocketMessage {
 export const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'http://localhost:3000', '*'];
-
-const HEADERS = {
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, PATCH, DELETE",
-  "Access-Control-Allow-Headers": "X-Requested-With,content-type",
-  "Access-Control-Allow-Credentials": true
-};
-
+// CORS setup
+const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'http://localhost:3000'];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -46,9 +39,7 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  methods: HEADERS["Access-Control-Allow-Methods"],
-  allowedHeaders: HEADERS["Access-Control-Allow-Headers"],
-  credentials: HEADERS["Access-Control-Allow-Credentials"]
+  credentials: true,
 }));
 
 // Middleware setup
@@ -206,26 +197,6 @@ async function handleMessage(message: WebSocketMessage, ws: WebSocket) {
     }
   });
 }
-
-server.on('request', (request: http.IncomingMessage, response: http.ServerResponse) => {
-  try {
-    const headers = {
-      ...HEADERS,
-      ...(request.method === 'POST' && { 'Content-Type': 'application/json' }),
-    };
-    response.writeHead(200, headers as any); // Cast headers as any to satisfy the type checker
-    if (request.method === 'POST') {
-      const copilotKit = new CopilotBackend();
-      const openaiAdapter = new OpenAIAdapter();
-      copilotKit.streamHttpServerResponse(request, response, openaiAdapter);
-    } else {
-      response.end('openai server');
-    }
-  } catch (err) {
-    console.error(err);
-    response.end('error');
-  }
-});
 
 const api = express.Router();
 

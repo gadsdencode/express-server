@@ -7,7 +7,7 @@ import { body, validationResult } from 'express-validator';
 import crypto from 'crypto';
 import { config } from 'dotenv';
 import winston from 'winston';
-import fetch from 'node-fetch'; 
+import fetch from 'node-fetch';
 
 config(); // Loads environment variables from .env file
 
@@ -528,7 +528,7 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
   }
 });
 
-  api.get('/search-users', async (req: Request, res: Response) => {
+  app.get('/search-users', async (req: Request, res: Response) => {
     const { query, page = 1, limit = 10, sort = 'name', order = 'asc' } = req.query;
   
     if (!query) {

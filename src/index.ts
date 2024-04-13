@@ -528,7 +528,7 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
   }
 });
 
-  app.get('/search-users', async (req: Request, res: Response) => {
+  app.get('/search-users-filtered', async (req: Request, res: Response) => {
     const { query, page = 1, limit = 10, sort = 'name', order = 'asc' } = req.query;
   
     if (!query) {

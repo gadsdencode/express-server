@@ -32,6 +32,15 @@ interface DailyRoomResponse {
   error?: { message: string };
 }
 
+interface User {
+  id: string;
+  // Add other user properties as needed
+}
+
+interface UserRequest extends Request {
+  user?: User;
+}
+
 export const app = express();
 const server = http.createServer(app);
 
@@ -544,6 +553,43 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
     } catch (error) {
       const message = (error as { message: string }).message || 'An unexpected error occurred';
       res.status(500).json({ message });
+    }
+  });
+
+  api.get('/search-users-filtered', async (req: UserRequest, res: Response) => {
+  const userId = req.user?.id; // Assuming the user ID is available in the request object
+  const query = req.query.query as string;
+  
+    if (!query) {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
+  
+    try {
+      const { data: userCoachRelationships, error: relationshipsError } = await supabase
+        .from('user_coach_relationships')
+        .select('coach_id')
+        .eq('user_id', userId);
+  
+      if (relationshipsError) {
+        throw relationshipsError;
+      }
+  
+      const coachIds = userCoachRelationships.map((relationship) => relationship.coach_id);
+  
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', coachIds)
+        .ilike('name', `%${query}%`);
+  
+      if (profilesError) {
+        throw profilesError;
+      }
+  
+      res.status(200).json({ profiles });
+    } catch (error) {
+      console.error('Error searching users:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
   

@@ -590,7 +590,7 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
       const userCoachRelationships = await supabase
         .from('user_coach_relationships')
         .select('user_id')
-        .eq('user_id', userId);
+        .eq('coach_id', userId);
   
       if (userCoachRelationships.error) throw userCoachRelationships.error;
       if (userCoachRelationships.data.length === 0) return res.status(404).json({ message: 'No coaches found for this user.' });

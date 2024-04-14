@@ -32,15 +32,6 @@ interface DailyRoomResponse {
   error?: { message: string };
 }
 
-interface User {
-  id: string;
-  // Add other user properties as needed
-}
-
-interface UserRequest extends Request {
-  user?: User;
-}
-
 type Error = {
   message: string;
 }
@@ -560,50 +551,35 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
     }
   });
 
-  api.get('/search-users-filtered', async (req: UserRequest, res: Response) => {
-    const userId = req.user?.id;  // Ensure this is correctly populated
-    const query = req.query.query as string;
+  api.get('/search-users-filtered', async (req, res) => {
+    const { userId, query } = req.query;
   
-    if (!userId) {
-      return res.status(400).json({ message: 'User ID is required' });
-    }
-  
-    if (!query) {
-      return res.status(400).json({ message: 'Search query is required' });
-    }
+    if (!userId) return res.status(400).json({ message: 'User ID is required' });
+    if (!query) return res.status(400).json({ message: 'Search query is required' });
   
     try {
-      const { data: userCoachRelationships, error: relationshipsError } = await supabase
+      const userCoachRelationships = await supabase
         .from('user_coach_relationships')
         .select('coach_id')
         .eq('user_id', userId);
   
-      if (relationshipsError) {
-        throw new Error(relationshipsError.message);
-      }
+      if (userCoachRelationships.error) throw userCoachRelationships.error;
+      if (userCoachRelationships.data.length === 0) return res.status(404).json({ message: 'No coaches found for this user.' });
   
-      const coachIds = userCoachRelationships.map(relationship => relationship.coach_id);
-  
-      if (coachIds.length === 0) {
-        return res.status(404).json({ message: 'No coaches found for this user.' });
-      }
-  
-      const { data: profiles, error: profilesError } = await supabase
+      const coachIds = userCoachRelationships.data.map(relationship => relationship.coach_id);
+      const profiles = await supabase
         .from('profiles')
         .select('*')
         .in('id', coachIds)
         .ilike('name', `%${query}%`);
   
-      if (profilesError) {
-        throw new Error(profilesError.message);
-      }
-  
-      res.status(200).json({ profiles });
-    } catch (error: any) {
-      console.error('Error searching users:', error);
-      res.status(500).json({ message: 'Internal server error', details: error.message });
+      if (profiles.error) throw profiles.error;
+      res.status(200).json(profiles.data);
+    } catch (err) {
+      res.status(500).json({ message: 'Internal server error', details: (err as Error).message });
     }
   });
+  
   
   
   

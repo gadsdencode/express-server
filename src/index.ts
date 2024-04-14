@@ -41,6 +41,10 @@ interface UserRequest extends Request {
   user?: User;
 }
 
+type Error = {
+  message: string;
+}
+
 export const app = express();
 const server = http.createServer(app);
 
@@ -557,41 +561,45 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
   });
 
   api.get('/search-users-filtered', async (req: UserRequest, res: Response) => {
-  const userId = req.user?.id; // Assuming the user ID is available in the request object
-  const query = req.query.query as string;
+    const userId = req.user?.id; // Correctly access user ID assumed to be set by authentication middleware
+    const query = req.query.query as string;
   
     if (!query) {
       return res.status(400).json({ message: 'Search query is required' });
     }
   
     try {
+      // Fetch relationships to find relevant coach IDs
       const { data: userCoachRelationships, error: relationshipsError } = await supabase
         .from('user_coach_relationships')
         .select('coach_id')
         .eq('user_id', userId);
   
-      if (relationshipsError) {
-        throw relationshipsError;
+      if (relationshipsError) throw new Error(relationshipsError.message);
+  
+      // Extract coach IDs from relationships
+      const coachIds = userCoachRelationships.map(relationship => relationship.coach_id);
+  
+      if (coachIds.length === 0) {
+        return res.status(404).json({ message: 'No coaches found for this user.' });
       }
   
-      const coachIds = userCoachRelationships.map((relationship) => relationship.coach_id);
-  
+      // Query profiles with coach IDs
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .in('id', coachIds)
         .ilike('name', `%${query}%`);
   
-      if (profilesError) {
-        throw profilesError;
-      }
+      if (profilesError) throw new Error(profilesError.message);
   
       res.status(200).json({ profiles });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching users:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', details: error.message });
     }
   });
+  
   
   api.get('/search-suggestions', async (req: Request, res: Response) => {
     const { query } = req.query;

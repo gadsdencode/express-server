@@ -495,6 +495,7 @@ api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) =
   }
 
   try {
+    // Step 1: Fetch user IDs related to the coach
     const { data: userRelationships, error: relationshipsError } = await supabase
       .from('user_coach_relationships')
       .select('user_id')
@@ -504,16 +505,19 @@ api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) =
       throw relationshipsError;
     }
 
-    if (!userRelationships.length) {
-      return res.status(404).json({ message: 'No related users found.' });
+    if (userRelationships.length === 0) {
+      return res.status(404).json({ message: 'No related users found for this coach.' });
     }
 
     const userIds = userRelationships.map(relationship => relationship.user_id);
+
+    // Step 2: Fetch notes for the related users
     let query = supabase
       .from('notes')
       .select('*')
       .in('userId', userIds);
 
+    // Step 3: Filter notes by relatedUser if provided
     if (relatedUserName) {
       query = query.ilike('relatedUser', `%${relatedUserName}%`);
     }
@@ -524,6 +528,7 @@ api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) =
       throw notesError;
     }
 
+    // Step 4: Return the filtered notes
     res.status(200).json(notes);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error', details: (error as Error).message });

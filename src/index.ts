@@ -488,14 +488,14 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
 });
 
 api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) => {
-  const { userId } = req.query;  // Assuming 'userId' is the coach's ID and 'role' is omitted for simplicity
+  const { userId, relatedUserName } = req.query;  // Expecting relatedUserName as a parameter for filtering
 
   if (!userId) {
       return res.status(400).json({ message: 'UserId is required' });
   }
 
   try {
-      // Fetch users related to the coach
+      // Fetch user IDs related to the coach
       const { data: userRelationships, error: relationshipError } = await supabase
           .from('user_coach_relationships')
           .select('user_id')
@@ -508,12 +508,18 @@ api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) =
       }
 
       const userIds = userRelationships.map(relationship => relationship.user_id);
-
-      // Fetch notes for these users
-      const { data: notes, error: notesError } = await supabase
+      let query = supabase
           .from('notes')
           .select('*')
           .in('userId', userIds);
+
+      // Filter by relatedUser if provided
+      if (relatedUserName) {
+          query = query
+              .ilike('relatedUser', `%${relatedUserName}%`);
+      }
+
+      const { data: notes, error: notesError } = await query;
 
       if (notesError) throw notesError;
 
@@ -522,6 +528,7 @@ api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) =
       res.status(500).json({ message: 'Internal server error', details: (error as Error).message });
   }
 });
+
 
 
 api.get('/coach-user-relationships', async (req: Request, res: Response) => {

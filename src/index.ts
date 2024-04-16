@@ -31,6 +31,15 @@ type Error = {
   message: string;
 }
 
+type ErrorType = {
+  message: string;
+}
+
+interface CreateRoomRequest {
+  user1Id: string;
+  user2Id: string;
+}
+
 export const app = express();
 const server = http.createServer(app);
 
@@ -86,41 +95,37 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 app.post('/api/v1/create-room', async (req: Request, res: Response) => {
   try {
-      const existingRoomCheck = await supabase
-          .from('profiles')
-          .select('room_url')
-          .not('room_url', 'is', null)
-          .single();
+    const { user1Id, user2Id } = req.body as CreateRoomRequest;
 
-      if (existingRoomCheck.data) {
-          res.status(200).json({ room_url: existingRoomCheck.data.room_url });
-          return;
-      }
+    // Generate a unique room name based on the user IDs
+    const roomName = `${user1Id}-${user2Id}`;
 
-      const response = await fetch('https://api.daily.co/v1/rooms', {
-          method: 'POST',
-          headers: {
-              'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-              properties: {
-                  exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60),  // Room expires after 2 hours
-                  enable_chat: true,
-              },
-          }),
-      });
+    // Create the room using the Daily.co API
+    const response = await fetch('https://api.daily.co/v1/rooms', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: roomName,
+        properties: {
+          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60),  // Room expires after 2 hours
+          enable_chat: true,
+        },
+      }),
+    });
 
-      if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`API call failed with status ${response.status}: ${errorData.error?.message}`);
-      }
+    if (!response.ok) {
+      const errorData: { error?: ErrorType } = await response.json();
+      throw new Error(`API call failed with status ${response.status}: ${errorData.error?.message}`);
+    }
 
-      const { url } = await response.json();
-      res.status(200).json({ room_url: url });
-  } catch (error) {
-      logger.error('Failed to create room: ', (error as Error).message);
-      res.status(500).json({ error: (error as Error).message });
+    const data: { url: string } = await response.json();
+    res.status(200).json({ room_url: data.url });
+  } catch (error: any) {
+    logger.error('Failed to create room: ', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -487,6 +487,33 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   }
 });
 
+api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) => {
+  const { userId, role } = req.query;  // Ensure 'role' is also expected as a query parameter
+
+  if (!userId || !role) {
+      return res.status(400).json({ message: 'UserId and UserRole are required' });
+  }
+
+  try {
+      let query;
+      if (role === 'coach') {
+          query = supabase.from('user_coach_relationships').select('user_id').eq('coach_id', userId);
+      } else {
+          query = supabase.from('user_coach_relationships').select('coach_id').eq('user_id', userId);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+          throw error;
+      }
+      res.json(data);
+  } catch (error) {
+      const message = (error as { message: string }).message || 'An unexpected error occurred';
+      res.status(500).json({ message });
+  }
+});
+
+
 api.get('/coach-user-relationships', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;
   const role = req.query.role as string;

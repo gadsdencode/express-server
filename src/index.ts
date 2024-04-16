@@ -40,7 +40,7 @@ export const app = express();
 const server = http.createServer(app);
 
 // CORS setup
-const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'http://localhost:3000'];
+const allowedOrigins = ['https://kainbridge.vercel.app', 'https://kainbridge.com/coaching/', 'http://localhost:3000', 'https://kainbridge.com/', 'https://kainbridge.com/app/', 'https://kainbridge.com/coaching-2/', 'https://kainbridge.com/coach-signup/'];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {

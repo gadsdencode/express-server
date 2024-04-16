@@ -488,28 +488,38 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
 });
 
 api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) => {
-  const { userId, role } = req.query;  // Ensure 'role' is also expected as a query parameter
+  const { userId } = req.query;  // Assuming 'userId' is the coach's ID and 'role' is omitted for simplicity
 
-  if (!userId || !role) {
-      return res.status(400).json({ message: 'UserId and UserRole are required' });
+  if (!userId) {
+      return res.status(400).json({ message: 'UserId is required' });
   }
 
   try {
-      let query;
-      if (role === 'coach') {
-          query = supabase.from('user_coach_relationships').select('user_id').eq('coach_id', userId);
-      } else {
-          query = supabase.from('user_coach_relationships').select('coach_id').eq('user_id', userId);
+      // Fetch users related to the coach
+      const { data: userRelationships, error: relationshipError } = await supabase
+          .from('user_coach_relationships')
+          .select('user_id')
+          .eq('coach_id', userId);
+
+      if (relationshipError) throw relationshipError;
+
+      if (userRelationships.length === 0) {
+          return res.status(404).json({ message: 'No related users found for this coach.' });
       }
 
-      const { data, error } = await query;
-      if (error) {
-          throw error;
-      }
-      res.json(data);
+      const userIds = userRelationships.map(relationship => relationship.user_id);
+
+      // Fetch notes for these users
+      const { data: notes, error: notesError } = await supabase
+          .from('notes')
+          .select('*')
+          .in('userId', userIds);
+
+      if (notesError) throw notesError;
+
+      res.status(200).json(notes);
   } catch (error) {
-      const message = (error as { message: string }).message || 'An unexpected error occurred';
-      res.status(500).json({ message });
+      res.status(500).json({ message: 'Internal server error', details: (error as Error).message });
   }
 });
 

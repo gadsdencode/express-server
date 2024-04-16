@@ -488,35 +488,30 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
 });
 
 api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) => {
-  const { userId, relatedUserName } = req.query;  // Expecting relatedUserName as a parameter for filtering
+  const { userId, relatedUserName } = req.query;
 
   if (!userId) {
       return res.status(400).json({ message: 'UserId is required' });
   }
 
   try {
-      // Fetch user IDs related to the coach
-      const { data: userRelationships, error: relationshipError } = await supabase
+      const userIds = await supabase
           .from('user_coach_relationships')
           .select('user_id')
-          .eq('coach_id', userId);
+          .eq('coach_id', userId)
+          .then(res => res.data.map(relationship => relationship.user_id));
 
-      if (relationshipError) throw relationshipError;
-
-      if (userRelationships.length === 0) {
-          return res.status(404).json({ message: 'No related users found for this coach.' });
+      if (userIds.length === 0) {
+          return res.status(404).json({ message: 'No related users found.' });
       }
 
-      const userIds = userRelationships.map(relationship => relationship.user_id);
       let query = supabase
           .from('notes')
           .select('*')
           .in('userId', userIds);
 
-      // Filter by relatedUser if provided
       if (relatedUserName) {
-          query = query
-              .ilike('relatedUser', `%${relatedUserName}%`);
+          query = query.ilike('relatedUser', `%${relatedUserName}%`);
       }
 
       const { data: notes, error: notesError } = await query;
@@ -528,6 +523,7 @@ api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) =
       res.status(500).json({ message: 'Internal server error', details: (error as Error).message });
   }
 });
+
 
 
 

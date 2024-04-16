@@ -551,6 +551,39 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
     }
   });
 
+  api.get('/search-users-filtered-notes', async (req, res) => {
+    const { userId, query } = req.query;  // `query` now expected to be part of a name to search for
+  
+    if (!userId) return res.status(400).json({ message: 'User ID is required' });
+    if (!query) return res.status(400).json({ message: 'Search query is required' });
+  
+    try {
+      // Fetch user IDs that this coach can access
+      const userCoachRelationships = await supabase
+        .from('user_coach_relationships')
+        .select('user_id')
+        .eq('coach_id', userId);
+  
+      if (userCoachRelationships.error) throw userCoachRelationships.error;
+      if (userCoachRelationships.data.length === 0) return res.status(404).json({ message: 'No related users found for this coach.' });
+  
+      const userIds = userCoachRelationships.data.map(relationship => relationship.user_id);
+  
+      // Fetch profiles where the name matches the query and the ID is in the list of user IDs this coach can access
+      const profiles = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds)
+        .ilike('name', `%${query}%`);
+  
+      if (profiles.error) throw profiles.error;
+      res.status(200).json(profiles.data);
+    } catch (err) {
+      res.status(500).json({ message: 'Internal server error', details: (err as Error).message });
+    }
+});
+
+
   api.get('/search-users-filtered', async (req, res) => {
     const { userId, query } = req.query;
   

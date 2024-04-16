@@ -487,41 +487,44 @@ api.get('/fetch-corresponding-user', async (req: Request, res: Response) => {
   }
 });
 
-api.get('/fetch-corresponding-user-notes', async (req, res) => {
-  const { userId, relatedUserName } = req.query;
+api.get('/fetch-corresponding-user-notes', async (req: Request, res: Response) => {
+  const { userId, relatedUserName } = req.query as { userId?: string, relatedUserName?: string };
 
   if (!userId) {
     return res.status(400).json({ message: 'UserId is required' });
   }
 
   try {
-    const userRelationships = await supabase
+    const { data: userRelationships, error: relationshipsError } = await supabase
       .from('user_coach_relationships')
       .select('user_id')
       .eq('coach_id', userId);
 
-    if (userRelationships.error) {
-      throw userRelationships.error;
+    if (relationshipsError) {
+      throw relationshipsError;
     }
 
-    if (userRelationships.data.length === 0) {
+    if (!userRelationships.length) {
       return res.status(404).json({ message: 'No related users found.' });
     }
 
-    const userIds = userRelationships.data.map(relationship => relationship.user_id.toString());
-    let query = supabase.from('notes').select('*').in('userId', userIds);
+    const userIds = userRelationships.map(relationship => relationship.user_id);
+    let query = supabase
+      .from('notes')
+      .select('*')
+      .in('userId', userIds);
 
     if (relatedUserName) {
       query = query.ilike('relatedUser', `%${relatedUserName}%`);
     }
 
-    const notes = await query;
+    const { data: notes, error: notesError } = await query;
 
-    if (notes.error) {
-      throw notes.error;
+    if (notesError) {
+      throw notesError;
     }
 
-    res.status(200).json(notes.data);
+    res.status(200).json(notes);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error', details: (error as Error).message });
   }

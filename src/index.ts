@@ -31,11 +31,6 @@ type Error = {
   message: string;
 }
 
-interface DailyRoomResponse {
-  url: string;
-  error?: { message: string };
-}
-
 export const app = express();
 const server = http.createServer(app);
 
@@ -89,7 +84,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-app.post('/api/v1/create-room', async (req: Request, res: Response) => {
+app.post('/api/v1/create-room', async (req, res) => {
   try {
     const response = await fetch('https://api.daily.co/v1/rooms', {
       method: 'POST',
@@ -99,24 +94,24 @@ app.post('/api/v1/create-room', async (req: Request, res: Response) => {
       },
       body: JSON.stringify({
         properties: {
-          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60),  // Room expires after 2 hours
+          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60), // Room expires after 2 hours
           enable_chat: true,
         },
       }),
     });
 
+    const data = await response.json();
     if (!response.ok) {
-      const errorData: DailyRoomResponse = await response.json();
-      throw new Error(`API call failed with status ${response.status}: ${errorData.error?.message ?? 'No error message'}`);
+        throw new Error(`Error: ${data.error ? data.error.message : 'API call failed'}`);
     }
 
-    const data: DailyRoomResponse = await response.json();
     res.status(200).json({ room_url: data.url });
   } catch (error: any) {
-    logger.error('Failed to create room: ', error.message);
+    logger.error('Failed to create room:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
+
 
 
 

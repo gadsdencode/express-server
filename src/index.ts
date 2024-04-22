@@ -89,28 +89,33 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-app.post('/api/v1/create-room', async (req, res) => {
+app.post('/api/v1/create-room', async (req: Request<{}, {}, CreateRoomRequest>, res) => {
+  const { user1Id, user2Id } = req.body;
+  if (!user1Id || !user2Id) {
+    return res.status(400).send({ error: 'Missing user IDs in the request body.' });
+  }
+
   try {
-      const { user1Id, user2Id } = req.body as CreateRoomRequest;
-      
-      // Optionally, verify roles before creating a room
-      const users = await supabase
+      // Fetch roles and validate them directly in the query for efficiency
+      const { data: users, error } = await supabase
           .from('profiles')
           .select('id, role')
           .in('id', [user1Id, user2Id]);
 
-      if (users.data.length === 2) {
-          // Implement role checks as per your requirement here
-          // For example, ensure that one is a 'coach' and the other is a 'user'
-          const roles = users.data.map(user => user.role);
-          if (!roles.includes('coach') || !roles.includes('user')) {
-              res.status(400).send({error: 'Invalid user pair based on roles.'});
-              return;
-          }
+      if (error) {
+          throw new Error(`Failed to fetch user roles: ${error.message}`);
       }
 
-      const roomName = `room_${user1Id}_${user2Id}`; // Ensure unique room names based on user IDs
+      if (users.length !== 2) {
+        return res.status(400).send({ error: 'User pair not found or invalid.' });
+    }
+    
+    const roles = users.map(user => user.role);
+    if (!(roles.includes('coach') && roles.includes('user'))) {
+        return res.status(400).send({ error: 'Invalid user pair based on roles. Ensure one coach and one user.' });
+    }    
 
+      const roomName = `room_${user1Id}_${user2Id}`; // Unique room names based on user IDs
       const response = await fetch('https://api.daily.co/v1/rooms', {
           method: 'POST',
           headers: {
@@ -126,18 +131,18 @@ app.post('/api/v1/create-room', async (req, res) => {
           }),
       });
 
-      if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`API call failed: ${errorData.error?.message}`);
-      }
-
-      const { url } = await response.json();
-      res.status(200).json({ room_url: url });
-  } catch (error) {
-    logger.error('Failed to create room:', (error as Error).message);
-    res.status(500).json({ error: (error as Error).message });
+      const errorData = await response.json(); // parse JSON once
+        if (!response.ok) {
+            throw new Error(`API call failed with ${response.status}: ${errorData.error?.message}`);
+        }
+        const { url } = errorData; // use the already parsed JSON
+        res.status(200).json({ room_url: url });
+  } catch (error: any) {
+    console.error('Failed to create room:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
+
 
 
 

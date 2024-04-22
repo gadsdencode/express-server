@@ -90,60 +90,39 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-app.post('/api/v1/create-room', async (req: Request<{}, {}, CreateRoomRequest>, res) => {
-  const { user1Id, user2Id } = req.body;
-  if (!user1Id || !user2Id) {
-    return res.status(400).send({ error: 'Missing user IDs in the request body.' });
-  }
-
+app.post('/api/v1/create-room', async (req, res) => {
   try {
-      // Fetch roles and validate them directly in the query for efficiency
-      const { data: users, error } = await supabase
-          .from('profiles')
-          .select('id, role')
-          .in('id', [user1Id, user2Id]);
+    const { user1Id, user2Id } = req.body as CreateRoomRequest;
 
-      if (error) {
-          throw new Error(`Failed to fetch user roles: ${error.message}`);
-      }
+    // Generate a unique room name based on the user IDs
+    const roomName = `${user1Id}-${user2Id}`;
 
-      if (users.length !== 2) {
-        return res.status(400).send({ error: 'User pair not found or invalid.' });
-    }
-    
-    const roles = users.map(user => user.role);
-    if (!(roles.includes('coach') && roles.includes('user'))) {
-        return res.status(400).send({ error: 'Invalid user pair based on roles. Ensure one coach and one user.' });
-    }    
-
-      const roomName = `room_${user1Id}_${user2Id}`; // Unique room names based on user IDs
-      const response = await fetch('https://api.daily.co/v1/rooms', {
-          method: 'POST',
-          headers: {
-              'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-              name: roomName,
-              properties: {
-                  exp: Math.floor(Date.now() / 1000) + 7200, // Room expires after 2 hours
-                  enable_chat: true,
-              },
-          }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`API call failed with ${response.status}: ${errorData.error?.message}`);
-    }
-
-        const { url } = await response.json();
-        res.status(200).json({ room_url: url });
-    } catch (error: any) {
-        console.error('Failed to create room:', error.message);
-        res.status(500).json({ error: error.message });
-    }
+    // Create the room using the Daily.co API
+    const response = await fetch('https://api.daily.co/v1/rooms', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: roomName,
+        properties: {
+          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60),  // Room expires after 2 hours
+          enable_chat: true,
+        },
+      }),
     });
+
+    if (!response.ok) {
+      const errorData: { error: any } = await response.json();
+      throw new Error(`API call failed with status ${response.status}: ${errorData.error?.message}`);
+    }
+
+    const data: { url: string } = await response.json();
+    res.status(200).json({ room_url: data.url });
+  } catch (error: any) {
+    logger.error('Failed to create room: ', error.message);
+    res.status(500).json({ error: error.message });
 
 
 
@@ -922,4 +901,4 @@ api.get('/coach-user-relationships', async (req: Request, res: Response) => {
   const port = process.env.PORT || 3333;
   server.listen(port, () => {
     console.log(`Server started on port ${port}`);
-  });
+  })}})

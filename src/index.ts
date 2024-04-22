@@ -31,6 +31,11 @@ type Error = {
   message: string;
 }
 
+interface DailyRoomResponse {
+  url: string;
+  error?: { message: string };
+}
+
 export const app = express();
 const server = http.createServer(app);
 
@@ -84,21 +89,8 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-app.post('/api/v1/create-room', async (req, res) => {
+app.post('/api/v1/create-room', async (req: Request, res: Response) => {
   try {
-    const { user1Id, user2Id } = req.body;
-    const users = await supabase.from('profiles').select('id, role').in('id', [user1Id, user2Id]);
-
-    if (users.data && users.data.length === 2) {
-      const roles = users.data.map(user => user.role);
-      if (!roles.includes('coach') || !roles.includes('user')) {
-        return res.status(400).send({ error: 'Invalid user pair based on roles.' });
-      }
-    } else {
-      return res.status(404).send({ error: 'One or both users not found.' });
-    }
-
-    const roomName = `room_${user1Id}_${user2Id}`;
     const response = await fetch('https://api.daily.co/v1/rooms', {
       method: 'POST',
       headers: {
@@ -106,23 +98,22 @@ app.post('/api/v1/create-room', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: roomName,
         properties: {
-          exp: Math.floor(Date.now() / 1000) + 7200, // Room expires after 2 hours
+          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60),  // Room expires after 2 hours
           enable_chat: true,
         },
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`API call failed: ${errorData.error?.message}`);
+      const errorData: DailyRoomResponse = await response.json();
+      throw new Error(`API call failed with status ${response.status}: ${errorData.error?.message ?? 'No error message'}`);
     }
 
-    const { url } = await response.json();
-    res.status(200).json({ room_url: url });
+    const data: DailyRoomResponse = await response.json();
+    res.status(200).json({ room_url: data.url });
   } catch (error: any) {
-    console.error('Failed to create room:', error.message);
+    logger.error('Failed to create room: ', error.message);
     res.status(500).json({ error: error.message });
   }
 });

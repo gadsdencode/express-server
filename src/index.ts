@@ -131,17 +131,18 @@ app.post('/api/v1/create-room', async (req: Request<{}, {}, CreateRoomRequest>, 
           }),
       });
 
-      const errorData = await response.json(); // parse JSON once
-        if (!response.ok) {
-            throw new Error(`API call failed with ${response.status}: ${errorData.error?.message}`);
-        }
-        const { url } = errorData; // use the already parsed JSON
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`API call failed with ${response.status}: ${errorData.error?.message}`);
+    }
+
+        const { url } = await response.json();
         res.status(200).json({ room_url: url });
-  } catch (error: any) {
-    console.error('Failed to create room:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
+    } catch (error: any) {
+        console.error('Failed to create room:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+    });
 
 
 

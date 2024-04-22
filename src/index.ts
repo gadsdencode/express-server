@@ -91,8 +91,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 app.post('/api/v1/create-room', async (req: Request<{}, {}, CreateRoomRequest>, res) => {
-  const { user1Id, validProfileId } = req.body;
-  if (!user1Id || !validProfileId) {
+  const { user1Id, user2Id } = req.body;
+  if (!user1Id || !user2Id) {
     return res.status(400).send({ error: 'Missing user IDs in the request body.' });
   }
 
@@ -101,7 +101,7 @@ app.post('/api/v1/create-room', async (req: Request<{}, {}, CreateRoomRequest>, 
       const { data: users, error } = await supabase
           .from('profiles')
           .select('id, role')
-          .in('id', [user1Id, validProfileId]);
+          .in('id', [user1Id, user2Id]);
 
       if (error) {
           throw new Error(`Failed to fetch user roles: ${error.message}`);
@@ -116,7 +116,7 @@ app.post('/api/v1/create-room', async (req: Request<{}, {}, CreateRoomRequest>, 
         return res.status(400).send({ error: 'Invalid user pair based on roles. Ensure one coach and one user.' });
     }    
 
-      const roomName = `room_${user1Id}_${validProfileId}`; // Unique room names based on user IDs
+      const roomName = `room_${user1Id}_${user2Id}`; // Unique room names based on user IDs
       const response = await fetch('https://api.daily.co/v1/rooms', {
           method: 'POST',
           headers: {

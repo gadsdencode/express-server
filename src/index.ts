@@ -31,12 +31,6 @@ type Error = {
   message: string;
 }
 
-interface CreateRoomRequest {
-  user1Id: string;
-  user2Id: string;
-  validProfileId: string;
-}
-
 export const app = express();
 const server = http.createServer(app);
 
@@ -92,53 +86,47 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 app.post('/api/v1/create-room', async (req, res) => {
   try {
-      const { user1Id, user2Id } = req.body as CreateRoomRequest;
-      
-      // Optionally, verify roles before creating a room
-      const users = await supabase
-          .from('profiles')
-          .select('id, role')
-          .in('id', [user1Id, user2Id]);
+    const { user1Id, user2Id } = req.body;
+    const users = await supabase.from('profiles').select('id, role').in('id', [user1Id, user2Id]);
 
-      if (users.data.length === 2) {
-          // Implement role checks as per your requirement here
-          // For example, ensure that one is a 'coach' and the other is a 'user'
-          const roles = users.data.map(user => user.role);
-          if (!roles.includes('coach') || !roles.includes('user')) {
-              res.status(400).send({error: 'Invalid user pair based on roles.'});
-              return;
-          }
+    if (users.data && users.data.length === 2) {
+      const roles = users.data.map(user => user.role);
+      if (!roles.includes('coach') || !roles.includes('user')) {
+        return res.status(400).send({ error: 'Invalid user pair based on roles.' });
       }
+    } else {
+      return res.status(404).send({ error: 'One or both users not found.' });
+    }
 
-      const roomName = `room_${user1Id}_${user2Id}`; // Ensure unique room names based on user IDs
+    const roomName = `room_${user1Id}_${user2Id}`;
+    const response = await fetch('https://api.daily.co/v1/rooms', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: roomName,
+        properties: {
+          exp: Math.floor(Date.now() / 1000) + 7200, // Room expires after 2 hours
+          enable_chat: true,
+        },
+      }),
+    });
 
-      const response = await fetch('https://api.daily.co/v1/rooms', {
-          method: 'POST',
-          headers: {
-              'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-              name: roomName,
-              properties: {
-                  exp: Math.floor(Date.now() / 1000) + 7200, // Room expires after 2 hours
-                  enable_chat: true,
-              },
-          }),
-      });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API call failed: ${errorData.error?.message}`);
+    }
 
-      if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`API call failed: ${errorData.error?.message}`);
-      }
-
-      const { url } = await response.json();
-      res.status(200).json({ room_url: url });
-  } catch (error) {
-    logger.error('Failed to create room:', (error as Error).message);
-    res.status(500).json({ error: (error as Error).message });
+    const { url } = await response.json();
+    res.status(200).json({ room_url: url });
+  } catch (error: any) {
+    console.error('Failed to create room:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
+
 
 
 

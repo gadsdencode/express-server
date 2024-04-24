@@ -84,6 +84,34 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
+// API Endpoint to verify room URL validity
+app.get('/api/v1/verify-room', async (req, res) => {
+  const roomUrl = req.query.roomUrl; // Get room URL from query parameters
+  if (!roomUrl || typeof roomUrl !== 'string') {
+    return res.status(400).send({ error: 'Room URL is required' });
+  }
+
+  const roomName = roomUrl.split('/').pop(); // Extract room name from URL
+  const verifyUrl = `https://api.daily.co/v1/rooms/${roomName}`;
+
+  try {
+    const verifyResponse = await fetch(verifyUrl, {
+      headers: { 'Authorization': `Bearer ${process.env.DAILY_API_KEY}` }
+    });
+
+    const roomData = await verifyResponse.json();
+    if (!verifyResponse.ok) {
+      throw new Error('Room URL is expired or invalid');
+    }
+
+    res.status(200).json({ room: roomData });
+  } catch (error: any) {
+    logger.error(`Error verifying room URL: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 app.post('/api/v1/create-room', async (req, res) => {
   try {
     const response = await fetch('https://api.daily.co/v1/rooms', {

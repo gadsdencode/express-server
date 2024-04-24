@@ -112,36 +112,46 @@ app.get('/api/v1/verify-room', async (req, res) => {
 });
 
 
+// API Endpoint to create and synchronize room URL
 app.post('/api/v1/create-room', async (req, res) => {
+  const profileId = req.body.profileId;
+
   try {
-    const response = await fetch('https://api.daily.co/v1/rooms', {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('related_user_id')
+      .eq('id', profileId)
+      .single();
+
+    if (error || !profile) throw new Error(`Profile not found: ${error?.message}`);
+
+    // Create room
+    const roomResponse = await fetch('https://api.daily.co/v1/rooms', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.DAILY_API_KEY}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        properties: {
-          exp: Math.floor(Date.now() / 1000) + (2 * 60 * 60), // Room expires after 2 hours
-          enable_chat: true,
-        },
-      }),
+      body: JSON.stringify({ properties: { exp: Math.floor(Date.now() / 1000) + 7200 } }) // 2 hours expiration
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(`Error: ${data.error ? data.error.message : 'API call failed'}`);
-    }
+    const roomData = await roomResponse.json();
+    if (!roomResponse.ok) throw new Error(`Failed to create room: ${roomData.error?.message}`);
 
-    res.status(200).json({ room_url: data.url });
+    // Update profiles with new room URL
+    const updateResponse = await supabase
+      .from('profiles')
+      .update({ room_url: roomData.url })
+      .in('id', [profileId, profile.related_user_id]);
+
+    if (updateResponse.error) throw new Error(`Failed to update profiles: ${updateResponse.error.message}`);
+
+    res.status(200).json({ room_url: roomData.url });
   } catch (error: any) {
-    logger.error('Failed to create room:', error.message);
+    logger.error('Room creation failed:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
-
-
-
 
 
 
